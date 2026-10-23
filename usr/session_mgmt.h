@@ -5,6 +5,8 @@ struct node_rec;
 struct list_head;
 struct session_info;
 
+extern int iscsi_force_logout;
+
 extern int iscsi_login_portal(void *data, struct list_head *list,
 			      struct node_rec *rec);
 extern int iscsi_login_portal_nowait(struct node_rec *rec);

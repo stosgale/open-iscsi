@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "session_info.h"
@@ -33,6 +34,14 @@
 #include "log.h"
 #include "iscsid_req.h"
 #include "iscsi_err.h"
+#include "iscsi_ipc.h"
+#include "iscsi_if.h"
+#include "transport.h"
+
+int iscsi_force_logout = 0;
+
+/* Defined in usr/netlink.c */
+extern struct iscsi_ipc *ipc;
 
 static void log_login_msg(struct node_rec *rec, int rc)
 {
@@ -344,6 +353,44 @@ static int iscsid_logout_reqs_wait(struct list_head *list)
 	return ret;
 }
 
+static int iscsi_force_logout_sid(struct session_info *info)
+{
+	static int ctldev_opened;
+	struct iscsi_transport *t;
+	int rc;
+
+	t = iscsi_sysfs_get_transport_by_sid(info->sid);
+	if (!t) {
+		log_error("Could not find transport for session %d.",
+			  info->sid);
+		return ISCSI_ERR_TRANS_NOT_FOUND;
+	}
+
+	if (!ctldev_opened) {
+		if (ipc->ctldev_open() < 0) {
+			log_error("Could not open the netlink control device.");
+			return ISCSI_ERR_INTERNAL;
+		}
+		ctldev_opened = 1;
+	}
+
+	rc = ipc->stop_conn(t->handle, info->sid, 0, STOP_CONN_RECOVER);
+	if (rc)
+		log_debug(7, "stop_conn for session %d failed (%d), "
+			  "continuing with forced logout.", info->sid, rc);
+
+	rc = ipc->destroy_conn(t->handle, info->sid, 0);
+	if (rc)
+		log_debug(7, "destroy_conn for session %d failed (%d), "
+			  "continuing with forced logout.", info->sid, rc);
+
+	rc = ipc->destroy_session(t->handle, info->sid);
+	if (rc)
+		return rc;
+
+	return 0;
+}
+
 /**
  * iscsi_logout_portal - logout of portal
  * @info: session to log out of
@@ -359,6 +406,30 @@ int iscsi_logout_portal(struct session_info *info, struct list_head *list)
 		 "%s,%d]",
 		 info->sid, info->targetname, info->persistent_address,
 		 info->port);
+
+	if (iscsi_force_logout) {
+		rc = iscsid_req_by_sid(MGMT_IPC_SESSION_LOGOUT, info->sid);
+		if (!rc) {
+			log_logout_msg(info, rc);
+			return 0;
+		}
+
+		log_debug(7, "Normal logout of session %d failed (%d), "
+			  "forcing logout.", info->sid, rc);
+		rc = iscsi_force_logout_sid(info);
+		if (rc) {
+			log_error("Could not force logout of session %d: %s",
+				  info->sid, rc < 0 ? strerror(-rc) :
+				  iscsi_err_to_str(rc));
+			return ISCSI_ERR_LOGOUT;
+		}
+
+		log_info("Forced logout of [sid: %d, target: %s, "
+			 "portal: %s,%d] successful.",
+			 info->sid, info->targetname,
+			 info->persistent_address, info->port);
+		return 0;
+	}
 
 	if (list) {
 		async_req = calloc(1, sizeof(*async_req));

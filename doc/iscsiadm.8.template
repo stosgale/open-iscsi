@@ -473,6 +473,21 @@ Logout for the specified record.
 .IP
 This option is only valid for \fInode\fR and \fIsession\fR mode.
 .TP
+\fB\-f\fR, \fB\-\-force\fR
+Force the logout of a session that cannot be logged out normally, for
+example because it is stuck reconnecting or is in an invalid state.
+iscsiadm first attempts a normal logout and, if that fails, tears the
+session down directly through the transport, bypassing the reconnect and
+state checks.
+.IP
+WARNING: Forcing a logout abruptly destroys the session and all of its
+connections. This can interrupt I/O and may cause data loss or hang
+applications. Only use it for sessions that cannot be logged out
+normally.
+.IP
+This option is only valid with \fB\-u\fR/\fB\-\-logout\fR in \fInode\fR and
+\fIsession\fR mode.
+.TP
 \fB\-U\fR, \fB\-\-logoutall=\fI[all,manual,automatic|onboot]\fR
 Logout of all sessions with the node or conn startup values passed in or all
 running sessions, except ones marked \fIonboot\fR, if \fIall\fR is passed in.

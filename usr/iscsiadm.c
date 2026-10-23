@@ -112,8 +112,8 @@ struct verify_mode_t {
 static const struct verify_mode_t mode_paras[] = {
 	[MODE_DISCOVERY] = {"discovery", "DSIPdmntplov", 0},
 	[MODE_DISCOVERYDB] = {"discovery", "DSIPdmntplov", 0},
-	[MODE_NODE] = {"node", "RsPIdmlSonvupTULW", 0},
-	[MODE_SESSION] = {"session", "PiRdrmusonuSv", 1},
+	[MODE_NODE] = {"node", "RsPIdmlSonvupTULWf", 0},
+	[MODE_SESSION] = {"session", "PiRdrmusonuSvf", 1},
 	[MODE_HOST] = {"host", "CHdmPotnvxA", 0},
 	[MODE_IFACE] = {"iface", "HIdnvmPoCabci", 0},
 	[MODE_FW] = {"fw", "dmlWnv", 0},
@@ -137,6 +137,7 @@ static struct option const long_options[] =
 	{"login", no_argument, NULL, 'l'},
 	{"loginall", required_argument, NULL, 'L'},
 	{"logout", no_argument, NULL, 'u'},
+	{"force", no_argument, NULL, 'f'},
 	{"logoutall", required_argument, NULL, 'U'},
 	{"stats", no_argument, NULL, 's'},
 	{"killiscsid", required_argument, NULL, 'k'},
@@ -154,7 +155,7 @@ static struct option const long_options[] =
 	{"no_wait", no_argument, NULL, 'W'},
 	{NULL, 0, NULL, 0},
 };
-static char *short_options = ":RlDVhm:a:b:c:C:p:P:T:H:i:I:U:k:L:d:r:n:v:o:sSt:ux:A:W";
+static char *short_options = ":RlDVhm:a:b:c:C:p:P:T:H:i:I:U:k:L:d:r:n:v:o:sSt:ufx:A:W";
 
 static void usage(int status)
 {
@@ -166,13 +167,17 @@ static void usage(int status)
 iscsiadm -m discoverydb [-hV] [-d debug_level] [-P printlevel] [-t type -p ip:port -I ifaceN ... [-Dl]] | [[-p ip:port -t type] \
 [-o operation] [-n name] [-v value] [-lD]] \n\
 iscsiadm -m discovery [-hV] [-d debug_level] [-P printlevel] [-t type -p ip:port -I ifaceN ... [-l]] | [[-p ip:port] [-l | -D]] [-W]\n\
-iscsiadm -m node [-hV] [-d debug_level] [-P printlevel] [-L all,manual,automatic,onboot] [-W] [-U all,manual,automatic,onboot] [-S] [[-T targetname -p ip:port -I ifaceN] [-l | -u | -R | -s]] \
+iscsiadm -m node [-hV] [-d debug_level] [-P printlevel] [-L all,manual,automatic,onboot] [-W] [-U all,manual,automatic,onboot] [-S] [[-T targetname -p ip:port -I ifaceN] [-l | [-f] -u | -R | -s]] \
 [[-o operation ] [-n name] [-v value]]\n\
-iscsiadm -m session [-hV] [-d debug_level] [-P printlevel] [-r sessionid | sysfsdir [-R | -u | -s] [-o operation] [-n name] [-v value]]\n\
+iscsiadm -m session [-hV] [-d debug_level] [-P printlevel] [-r sessionid | sysfsdir [-R | [-f] -u | -s] [-o operation] [-n name] [-v value]]\n\
 iscsiadm -m iface [-hV] [-d debug_level] [-P printlevel] [-I ifacename | -H hostno|MAC] [[-o operation ] [-n name] [-v value]] [-C ping [-a ip] [-b packetsize] [-c count] [-i interval]]\n\
 iscsiadm -m fw [-d debug_level] [-l] [-W] [[-n name] [-v value]]\n\
 iscsiadm -m host [-P printlevel] [-H hostno|MAC] [[-C chap [-x chap_tbl_idx]] | [-C flashnode [-A portal_type] [-x flashnode_idx]] | [-C stats]] [[-o operation] [-n name] [-v value]] \n\
-iscsiadm -k priority\n");
+iscsiadm -k priority\n\
+\n\
+-f, --force may be used with -u, --logout in node or session mode to force\n\
+the logout of a session that is stuck reconnecting or is in an invalid\n\
+state. This tears the session down immediately and can disrupt I/O.\n");
 	}
 	exit(status);
 }
@@ -3789,6 +3794,9 @@ main(int argc, char **argv)
 			break;
 		case 'u':
 			do_logout = 1;
+			break;
+		case 'f':
+			iscsi_force_logout = 1;
 			break;
 		case 'U':
 			do_logout_all = 1;
